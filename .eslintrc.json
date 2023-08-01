@@ -1,0 +1,18 @@
+{
+    "root": true,
+    "extends": ["standard", "prettier"],
+    "env": {
+        "browser": false,
+        "node": true
+    },
+    "overrides": [
+        {
+            "files": ["*.ts", "*.tsx", "*.mts"],
+            "extends": ["standard-with-typescript", "prettier"],
+            "parserOptions": {
+                "sourceType": "module",
+                "project": "./tsconfig.json"
+            }
+        }
+    ]
+}

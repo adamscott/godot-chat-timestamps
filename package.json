@@ -1,0 +1,38 @@
+{
+  "name": "godot-chat-timestamps",
+  "version": "1.0.0",
+  "description": "Small script that converts Discord-like timestamps to real data",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm run build:dist && pnpm run build:types && pnpm run build:bundle",
+    "build:dist": "pnpm exec mkdirp ./dist",
+    "build:types": "tsc",
+    "build:bundle": "pnpm run build:bundle:index && pnpm run build:bundle:main",
+    "build:bundle:index": "pnpm run build:bundle:index:esm && pnpm run build:bundle:index:cjs",
+    "build:bundle:index:esm": "esbuild src/index.mts --bundle --minify --sourcemap --target=chrome109,edge112,firefox102,safari15 --outdir=./dist --allow-overwrite --format=esm --out-extension:.js=.mjs --splitting",
+    "build:bundle:index:cjs": "esbuild src/index.mts --bundle --minify --sourcemap --target=chrome109,edge112,firefox102,safari15 --outdir=./dist --allow-overwrite --format=cjs --out-extension:.js=.cjs",
+    "build:bundle:main": "pnpm run build:bundle:main:esm && pnpm run build:bundle:main:cjs",
+    "build:bundle:main:esm": "esbuild src/main.mts --bundle --minify --sourcemap --target=chrome109,edge112,firefox102,safari15 --outdir=./dist --allow-overwrite --format=esm --out-extension:.js=.mjs --splitting",
+    "build:bundle:main:cjs": "esbuild src/main.mts --bundle --minify --sourcemap --target=chrome109,edge112,firefox102,safari15 --outdir=./dist --allow-overwrite --format=cjs --out-extension:.js=.cjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": {
+    "email": "info@adamscott.studio",
+    "name": "Adam Scott",
+    "url": "https://github.com/adamscott"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.18.17",
+    "eslint": "^8.46.0",
+    "eslint-config-prettier": "^8.9.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-config-standard-with-typescript": "^37.0.0",
+    "mkdirp": "^3.0.1",
+    "typescript": "^5.1.6"
+  }
+}
