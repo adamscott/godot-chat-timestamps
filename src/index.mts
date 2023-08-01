@@ -49,41 +49,46 @@ function updateScrollArea(): void {
   currentScrollArea = scrollArea as HTMLDivElement;
   intersectionObserver?.disconnect();
 
-  intersectionObserver = new IntersectionObserver((entries, observer) => {
-    for (const entry of entries) {
-      const target = entry.target;
-      if (!(target instanceof HTMLSpanElement)) {
-        continue;
-      }
+  intersectionObserver = new IntersectionObserver(
+    (entries, _observer) => {
+      for (const entry of entries) {
+        const target = entry.target;
+        if (!(target instanceof HTMLSpanElement)) {
+          continue;
+        }
 
-      if (entry.isIntersecting) {
-        const intervalId = setInterval(() => {
-          let animationFrameRequestId = parseInt(
+        if (entry.isIntersecting) {
+          const intervalId = setInterval(() => {
+            let animationFrameRequestId = parseInt(
+              target.dataset.animationFrameRequestId ?? ""
+            );
+            if (animationFrameRequestId > 0) {
+              cancelAnimationFrame(animationFrameRequestId);
+            }
+
+            animationFrameRequestId = requestAnimationFrame(() => {
+              const timeDiff =
+                Date.now() - parseInt(target.dataset.targetTime ?? "");
+              updateRelativeSpanTextContent(target, timeDiff);
+            });
+
+            target.dataset.animationFrameRequestId = `${animationFrameRequestId}`;
+          }, 1_000);
+          target.dataset.intervalId = `${intervalId}`;
+        } else {
+          const intervalId = parseInt(target.dataset.intervalId ?? "");
+          const animationFrameRequestId = parseInt(
             target.dataset.animationFrameRequestId ?? ""
           );
-          if (animationFrameRequestId > 0) {
-            cancelAnimationFrame(animationFrameRequestId);
-          }
-
-          animationFrameRequestId = requestAnimationFrame(() => {
-            const timeDiff =
-              Date.now() - parseInt(target.dataset.targetTime ?? "");
-            updateRelativeSpanTextContent(target, timeDiff);
-          });
-
-          target.dataset.animationFrameRequestId = `${animationFrameRequestId}`;
-        }, 1_000);
-        target.dataset.intervalId = `${intervalId}`;
-      } else {
-        const intervalId = parseInt(target.dataset.intervalId ?? "");
-        const animationFrameRequestId = parseInt(
-          target.dataset.animationFrameRequestId ?? ""
-        );
-        clearInterval(intervalId);
-        cancelAnimationFrame(animationFrameRequestId);
+          clearInterval(intervalId);
+          cancelAnimationFrame(animationFrameRequestId);
+        }
       }
+    },
+    {
+      root: currentScrollArea,
     }
-  });
+  );
 }
 
 function replaceTimeTags(): void {
