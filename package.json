@@ -1,6 +1,6 @@
 {
   "name": "godot-chat-timestamps",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "description": "Small script that converts Discord-like timestamps to real data",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
