@@ -1,4 +1,5 @@
 export type Deactivate = () => void;
+export type TimestampType = "t" | "T" | "d" | "D" | "f" | "F" | "R";
 
 const DEFAULT_REFRESH_MS = 1_000;
 const TIMESTAMP_REGEX = /&lt;t:(?<time>\d+):(?<type>[tTdDfFR])&gt;/m;
@@ -9,8 +10,6 @@ const ONE_DAY_MS = 24 * ONE_HOUR_MS;
 const ONE_WEEK_MS = 7 * ONE_DAY_MS;
 const ONE_MONTH_MS = 30 * ONE_DAY_MS;
 const ONE_YEAR_MS = 365 * ONE_DAY_MS;
-
-export type TimestampType = "t" | "T" | "d" | "D" | "f" | "F" | "R";
 
 let currentScrollArea: HTMLDivElement | null = null;
 let intersectionObserver: IntersectionObserver | null = null;
@@ -221,42 +220,38 @@ function updateRelativeSpanTextContent(
   const absTimeDiff = Math.abs(timeDiff);
   let content = "";
 
+  let value!: number;
+  let unit!: Intl.RelativeTimeFormatUnit;
+
   if (absTimeDiff < ONE_MINUTE_MS) {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToSeconds(timeDiff)),
-      "seconds"
-    );
+    value = -timeDiffToSeconds(timeDiff);
+    unit = "seconds";
   } else if (absTimeDiff < ONE_HOUR_MS) {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToMinutes(timeDiff)),
-      "minutes"
-    );
+    value = -timeDiffToMinutes(timeDiff);
+    unit = "minutes";
   } else if (absTimeDiff < ONE_DAY_MS) {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToHours(timeDiff)),
-      "hours"
-    );
+    value = -timeDiffToHours(timeDiff);
+    unit = "hours";
   } else if (absTimeDiff < ONE_WEEK_MS) {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToDays(timeDiff)),
-      "days"
-    );
+    value = -timeDiffToDays(timeDiff);
+    unit = "days";
   } else if (absTimeDiff < ONE_MONTH_MS) {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToWeeks(timeDiff)),
-      "weeks"
-    );
+    value = -timeDiffToWeeks(timeDiff);
+    unit = "weeks";
   } else if (absTimeDiff < ONE_YEAR_MS) {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToMonths(timeDiff)),
-      "months"
-    );
+    value = -timeDiffToMonths(timeDiff);
+    unit = "months";
   } else {
-    content = relativeTimeFormat.format(
-      Math.floor(-timeDiffToYears(timeDiff)),
-      "years"
-    );
+    value = -timeDiffToYears(timeDiff);
+    unit = "years";
   }
+
+  if (value < 0) {
+    value = Math.ceil(value);
+  } else {
+    value = Math.floor(value);
+  }
+  content = relativeTimeFormat.format(value, unit);
 
   if (span.textContent !== content) {
     span.textContent = content;
