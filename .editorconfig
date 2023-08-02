@@ -13,3 +13,6 @@ insert_final_newline = true
 
 [*.{js,ts,mjs,mts}]
 indent_size = 2
+
+[*.{yaml,yml}]
+indent_size = 2
