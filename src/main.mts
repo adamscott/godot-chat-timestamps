@@ -1,9 +1,5 @@
 import { activate } from "./index.mts";
 
-declare global {
-  interface Window {
-    TIMESTAMP_REFRESH_TIME_MS?: number;
-  }
-}
+declare let TIMESTAMP_REFRESH_TIME_MS: number | undefined;
 
-activate(window.TIMESTAMP_REFRESH_TIME_MS);
+activate(TIMESTAMP_REFRESH_TIME_MS);
