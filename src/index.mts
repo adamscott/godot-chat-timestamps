@@ -4,6 +4,10 @@ export type TimestampType = "t" | "T" | "d" | "D" | "f" | "F" | "R";
 const DEFAULT_REFRESH_MS = 1_000;
 const TIMESTAMP_REGEX = /&lt;t:(?<time>\d+):(?<type>[tTdDfFR])&gt;/m;
 
+const GODOT_TIME_STAMP_CLASS = "godot-time-stamp";
+const GODOT_TIME_STAMP_ACTIVE_CLASS = `${GODOT_TIME_STAMP_CLASS}--active`;
+const GODOT_TIME_STAMP_RELATIVE_CLASS = `${GODOT_TIME_STAMP_CLASS}--relative`;
+
 const ONE_MINUTE_MS = 60 * 1000;
 const ONE_HOUR_MS = 60 * ONE_MINUTE_MS;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
@@ -16,29 +20,30 @@ let intersectionObserver: IntersectionObserver | null = null;
 let relativeDateSpanCounter = 0;
 
 export function activate(refreshTime = DEFAULT_REFRESH_MS): Deactivate {
-  let animationFrameRequestId = -1;
   let intervalId = -1;
+  let animationFrameId = -1;
 
   intervalId = setInterval(() => {
-    if (animationFrameRequestId !== -1) {
-      cancelAnimationFrame(animationFrameRequestId);
+    if (animationFrameId !== -1) {
+      cancelAnimationFrame(animationFrameId);
     }
-
-    animationFrameRequestId = requestAnimationFrame(() => {
+    animationFrameId = requestAnimationFrame(() => {
+      animationFrameId = -1;
       updateScrollArea();
-      replaceTimeTags();
+      replaceTimeTagsMessages();
+      replaceTimeTagsAnnouncement();
+      updateTimeTags();
     });
   }, refreshTime);
 
   return () => {
     clearInterval(intervalId);
-    cancelAnimationFrame(animationFrameRequestId);
   };
 }
 
 function updateScrollArea(): void {
   const scrollArea = document.querySelector(
-    ".messages-container .rc-scrollbars-view"
+    ".messages-container .rc-scrollbars-view",
   );
 
   if (scrollArea === currentScrollArea) {
@@ -56,76 +61,100 @@ function updateScrollArea(): void {
           continue;
         }
 
+        if (!target.classList.contains(GODOT_TIME_STAMP_CLASS)) {
+          continue;
+        }
+
         if (entry.isIntersecting) {
-          const intervalId = setInterval(() => {
-            let animationFrameRequestId = parseInt(
-              target.dataset.animationFrameRequestId ?? ""
-            );
-            if (animationFrameRequestId > 0) {
-              cancelAnimationFrame(animationFrameRequestId);
-            }
-
-            animationFrameRequestId = requestAnimationFrame(() => {
-              const timeDiff =
-                Date.now() - parseInt(target.dataset.targetTime ?? "");
-              updateRelativeSpanTextContent(target, timeDiff);
-            });
-
-            target.dataset.animationFrameRequestId = `${animationFrameRequestId}`;
-          }, 1_000);
-          target.dataset.intervalId = `${intervalId}`;
+          target.classList.add(GODOT_TIME_STAMP_ACTIVE_CLASS);
         } else {
-          const intervalId = parseInt(target.dataset.intervalId ?? "");
-          const animationFrameRequestId = parseInt(
-            target.dataset.animationFrameRequestId ?? ""
-          );
-          clearInterval(intervalId);
-          cancelAnimationFrame(animationFrameRequestId);
+          target.classList.remove(GODOT_TIME_STAMP_ACTIVE_CLASS);
         }
       }
     },
     {
       root: currentScrollArea,
-    }
+    },
   );
 }
 
-function replaceTimeTags(): void {
+function replaceTimeTagsMessages(): void {
   if (document.querySelector(".messages-list .loading-animation") != null) {
     return;
   }
 
   const messageBodyElements = Array.from(
-    document.querySelectorAll(".rcx-message-body")
-  );
+    document.querySelectorAll(".rcx-message-body"),
+  ) as HTMLElement[];
   for (const messageBodyElement of messageBodyElements) {
     let match = messageBodyElement.innerHTML.match(TIMESTAMP_REGEX);
     while (match != null) {
-      const time = match.groups?.time;
-      const type = match.groups?.type;
-
-      if (time == null || type == null) {
-        throw new Error(
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `Match returned invalid data (time: ${time}, type: ${type})`
-        );
-      }
-
-      let timeSpan = getTimeSpan(parseInt(time), type as TimestampType);
-      messageBodyElement.innerHTML = messageBodyElement.innerHTML.replace(
-        match[0],
-        timeSpan.outerHTML
-      );
-      timeSpan = document.getElementById(
-        `relative-date-span-${relativeDateSpanCounter - 1}`
-      ) as HTMLSpanElement;
-
-      if (type === "R") {
-        intersectionObserver?.observe(timeSpan);
-      }
-
+      replaceMatch(messageBodyElement, match, { observe: true });
       match = messageBodyElement.innerHTML.match(TIMESTAMP_REGEX);
     }
+  }
+}
+
+function replaceTimeTagsAnnouncement(): void {
+  const announcementElement = document.querySelector(
+    "[data-qa='AnnouncementAnnoucementComponent']",
+  ) as HTMLElement | null;
+  if (announcementElement == null) {
+    return;
+  }
+  let match = announcementElement.innerHTML.match(TIMESTAMP_REGEX);
+  while (match != null) {
+    replaceMatch(announcementElement, match, { active: true });
+    match = announcementElement.innerHTML.match(TIMESTAMP_REGEX);
+  }
+}
+
+function replaceMatch(
+  element: HTMLElement,
+  match: RegExpMatchArray,
+  options: { active?: boolean; observe?: boolean } = {},
+): void {
+  const active = options.active ?? false;
+  const observe = options.observe ?? false;
+
+  const time = match.groups?.time;
+  const type = match.groups?.type;
+
+  if (time == null || type == null) {
+    throw new Error(
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      `Match returned invalid data (time: ${time}, type: ${type})`,
+    );
+  }
+
+  let timeSpan = getTimeSpan(parseInt(time), type as TimestampType);
+  timeSpan.classList.add(GODOT_TIME_STAMP_CLASS);
+  if (active) {
+    timeSpan.classList.add(GODOT_TIME_STAMP_ACTIVE_CLASS);
+  }
+  element.innerHTML = element.innerHTML.replace(match[0], timeSpan.outerHTML);
+  timeSpan = document.getElementById(
+    `relative-date-span-${relativeDateSpanCounter - 1}`,
+  ) as HTMLSpanElement;
+
+  if (type === "R") {
+    timeSpan.classList.add(GODOT_TIME_STAMP_RELATIVE_CLASS);
+    if (observe) {
+      intersectionObserver?.observe(timeSpan);
+    }
+  }
+}
+
+function updateTimeTags(): void {
+  const tags = Array.from(
+    document.querySelectorAll(
+      `.${GODOT_TIME_STAMP_CLASS}.${GODOT_TIME_STAMP_ACTIVE_CLASS}.${GODOT_TIME_STAMP_RELATIVE_CLASS}`,
+    ),
+  ) as HTMLElement[];
+  const now = Date.now();
+  for (const tag of tags) {
+    const timeDiff = now - parseInt(tag.dataset.godotTimeStampTargetTime ?? "");
+    updateRelativeSpanTextContent(tag, timeDiff);
   }
 }
 
@@ -190,18 +219,18 @@ function getTimeSpan(time: number, type: TimestampType): HTMLSpanElement {
     default:
       throw new Error(
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        `Something went wrong, received ${type} as timestamp parameter`
+        `Something went wrong, received ${type} as timestamp parameter`,
       );
   }
 
   if (type === "R") {
     const timeDiff = Date.now() - date.getTime();
-    span.dataset.targetTime = `${date.getTime()}`;
+    span.dataset.godotTimeStampTargetTime = `${date.getTime()}`;
     updateRelativeSpanTextContent(span, timeDiff);
   } else {
     const dateTimeFormat = new Intl.DateTimeFormat(
       navigator.language,
-      dateTimeFormatOptions
+      dateTimeFormatOptions,
     );
     span.textContent = dateTimeFormat.format(date);
   }
@@ -211,7 +240,7 @@ function getTimeSpan(time: number, type: TimestampType): HTMLSpanElement {
 
 function updateRelativeSpanTextContent(
   span: HTMLSpanElement,
-  timeDiff: number
+  timeDiff: number,
 ): void {
   const relativeTimeFormat = new Intl.RelativeTimeFormat(navigator.language, {
     numeric: "always",
