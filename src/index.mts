@@ -179,6 +179,8 @@ function getTimeSpan(time: number, type: TimestampType): HTMLSpanElement {
   span.style.fontSize = "80%";
   span.style.paddingLeft = "10px";
   span.style.paddingRight = "10px";
+  span.style.color =
+    "var(--rcx-color-font-default,var(--rcx-color-neutral-800,#2f343d))";
   span.style.backgroundColor =
     "var(--rcx-tag-colors-default-background-color,var(--rcx-color-surface-neutral,var(--rcx-color-neutral-400,#e4e7ea)))";
   span.style.cursor = "default";
