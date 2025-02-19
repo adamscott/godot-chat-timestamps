@@ -168,11 +168,16 @@ function getTimeSpan(time: number, type: TimestampType): HTMLSpanElement {
   relativeDateSpanCounter += 1;
 
   // Title
-  span.title = new Intl.DateTimeFormat(navigator.language, {
+  const utcDateTimeFormat = new Intl.DateTimeFormat(navigator.language, {
     dateStyle: "short",
     timeStyle: "long",
     timeZone: "UTC",
   }).format(date);
+  const localDateTimeFormat = new Intl.DateTimeFormat(navigator.language, {
+    dateStyle: "short",
+    timeStyle: "long",
+  }).format(date);
+  span.title = `${localDateTimeFormat} (${utcDateTimeFormat})`;
 
   // Style
   span.style.display = "inline-block";
@@ -244,30 +249,76 @@ function updateRelativeSpanTextContent(
   span: HTMLSpanElement,
   timeDiff: number,
 ): void {
-  const relativeTimeFormat = new Intl.RelativeTimeFormat(navigator.language, {
-    numeric: "always",
-  });
-
   const absTimeDiff = Math.abs(timeDiff);
   let content = "";
 
   let value!: number;
   let unit!: Intl.RelativeTimeFormatUnit;
+  let numeric: Intl.RelativeTimeFormatNumeric = "auto";
+
+  const currentDate = new Date();
+  const targetDate = new Date(Date.now() - timeDiff);
+  let preciseHours = false;
+  let preciseDay = false;
 
   if (absTimeDiff < ONE_MINUTE_MS) {
     value = -timeDiffToSeconds(timeDiff);
     unit = "seconds";
+    numeric = "always";
+    preciseHours = true;
   } else if (absTimeDiff < ONE_HOUR_MS) {
     value = -timeDiffToMinutes(timeDiff);
     unit = "minutes";
+    numeric = "always";
+    preciseHours = true;
   } else if (absTimeDiff < ONE_DAY_MS) {
-    value = -timeDiffToHours(timeDiff);
-    unit = "hours";
+    if (currentDate.getDate() === targetDate.getDate()) {
+      value = -timeDiffToHours(timeDiff);
+      unit = "hours";
+      numeric = "always";
+      preciseHours = true;
+    } else {
+      const currentDateRounded = new Date(currentDate);
+      currentDateRounded.setHours(0, 0, 0, 0);
+      const targetDateRounded = new Date(targetDate);
+      targetDateRounded.setHours(0, 0, 0, 0);
+      value = -timeDiffToDays(
+        currentDateRounded.getTime() - targetDateRounded.getTime(),
+      );
+      unit = "days";
+      preciseHours = true;
+    }
   } else if (absTimeDiff < ONE_WEEK_MS) {
-    value = -timeDiffToDays(timeDiff);
-    unit = "days";
+    const [_currentDateFullYear, currentDateWeekNo] =
+      getWeekNumber(currentDate);
+    const [_targetDateFullYear, targetDateWeekNo] = getWeekNumber(targetDate);
+    if (currentDateWeekNo === targetDateWeekNo) {
+      const currentDateRounded = new Date(currentDate);
+      currentDateRounded.setHours(0, 0, 0, 0);
+      const targetDateRounded = new Date(targetDate);
+      targetDateRounded.setHours(0, 0, 0, 0);
+      value = -timeDiffToDays(
+        currentDateRounded.getTime() - targetDateRounded.getTime(),
+      );
+      unit = "days";
+      preciseHours = true;
+    } else {
+      value = -(currentDateWeekNo - targetDateWeekNo);
+      unit = "weeks";
+      preciseDay = true;
+    }
   } else if (absTimeDiff < ONE_MONTH_MS) {
+    const [_currentDateFullYear, currentDateWeekNo] =
+      getWeekNumber(currentDate);
+    const [_targetDateFullYear, targetDateWeekNo] = getWeekNumber(targetDate);
     value = -timeDiffToWeeks(timeDiff);
+    if (Math.abs(currentDateWeekNo - targetDateWeekNo) === 1) {
+      // This is the last ISO week (Monday - Sunday). Let's precise the day.
+      preciseDay = true;
+    } else {
+      // This is now calculating real weeks.
+      // Let's do nothing.
+    }
     unit = "weeks";
   } else if (absTimeDiff < ONE_YEAR_MS) {
     value = -timeDiffToMonths(timeDiff);
@@ -282,7 +333,43 @@ function updateRelativeSpanTextContent(
   } else {
     value = Math.floor(value);
   }
-  content = relativeTimeFormat.format(value, unit);
+
+  const preciseRelativeTimeFormat = new Intl.RelativeTimeFormat(
+    navigator.language,
+    {
+      numeric: numeric,
+    },
+  );
+  content = preciseRelativeTimeFormat.format(value, unit);
+
+  if (preciseDay || preciseHours) {
+    const localeTimeStringOptions: Parameters<Date["toLocaleTimeString"]>[1] = {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    };
+
+    if (unit == "days" && preciseHours) {
+      const hasAnInteger = preciseRelativeTimeFormat
+        .formatToParts(value, unit)
+        .some((relativeTimeFormatPart) => {
+          return relativeTimeFormatPart.type === "integer";
+        });
+      if (hasAnInteger) {
+        preciseHours = false;
+        preciseDay = true;
+      }
+    }
+
+    if (preciseDay) {
+      const weekday = new Intl.DateTimeFormat(navigator.language, {
+        weekday: "long",
+      }).format(targetDate);
+      content = `${content} (${weekday} @ ${targetDate.toLocaleTimeString(navigator.language, localeTimeStringOptions)})`;
+    } else if (preciseHours) {
+      content = `${content} (@ ${targetDate.toLocaleTimeString(navigator.language, localeTimeStringOptions)})`;
+    }
+  }
 
   if (span.textContent !== content) {
     span.textContent = content;
@@ -315,4 +402,17 @@ function timeDiffToMonths(timeDiff: number): number {
 
 function timeDiffToYears(timeDiff: number): number {
   return timeDiff / 1_000 / 60 / 60 / 24 / 365;
+}
+
+// From https://stackoverflow.com/a/6117889
+function getWeekNumber(date: Date) {
+  date = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return [date.getUTCFullYear(), weekNo];
 }
